@@ -1,0 +1,75 @@
+name: Kaggle smoke test
+
+# Verifies the Kaggle credentials stored in GitHub Actions secrets.
+# It does NOT run the notebook — it only proves the token works, so the
+# "secret is missing / wrong" failure happens here in 20s instead of inside
+# a 30-minute GPU session.
+#
+# Setup (once):
+#   https://github.com/SriAkhilSJ/OpenPost/settings/secrets/actions
+#     KAGGLE_USERNAME   = sriakhilsj
+#     KAGGLE_API_TOKEN  = token from https://www.kaggle.com/settings/api
+#                         (kaggle>=2.2 authenticates with this; legacy
+#                          KAGGLE_KEY is ignored by 2.x)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  auth:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required secrets exist
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+        run: |
+          missing=0
+          if [ -z "$KAGGLE_USERNAME" ]; then
+            echo "::error::KAGGLE_USERNAME is not set — add it under Settings → Secrets and variables → Actions"
+            missing=1
+          fi
+          if [ -z "$KAGGLE_API_TOKEN" ]; then
+            echo "::error::KAGGLE_API_TOKEN is not set — create one at https://www.kaggle.com/settings/api"
+            missing=1
+          fi
+          exit $missing
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Kaggle CLI
+        run: pip install -U "kaggle>=2.2"
+
+      - name: Verify Kaggle auth
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+        run: |
+          kaggle --version
+          echo "— own kernels (proves the token authenticates) —"
+          kaggle kernels list -m --page-size 5 || exit 1
+          echo "— public dataset search (proves the API is reachable) —"
+          kaggle datasets list -s anime --page-size 3
+
+      - name: Show how to push the notebook
+        run: |
+          cat <<'EOF'
+          Auth is good. To push/run the Kaggle kernel from your machine:
+
+            pip install -U "kaggle>=2.2"
+            export KAGGLE_USERNAME=sriakhilsj
+            export KAGGLE_API_TOKEN=...            # kaggle.com/settings/api
+            kaggle kernels push  -p kaggle/        # uses kaggle/kernel-metadata.json
+            kaggle kernels status sriakhilsj/openpost-anime-video
+            kaggle kernels output sriakhilsj/openpost-anime-video -p ./out
+
+          Note: github secrets are for CI only. A Kaggle notebook cannot read them —
+          it reads Add-ons → Secrets (see kaggle/README.md).
+          EOF
