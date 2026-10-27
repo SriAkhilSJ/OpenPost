@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "flow-mcp": {
+      "command": "node",
+      "args": ["flow-mcp-runtime/dist/index.js"],
+      "env": {
+        "FLOW_MCP_PORT": "8787"
+      }
+    },
+    "openpost": {
+      "type": "http",
+      "url": "http://localhost:8080/mcp"
+    },
+    "blotato": {
+      "type": "http",
+      "url": "https://mcp.blotato.com/mcp"
+    }
+  }
+}
